@@ -50,7 +50,7 @@ def create(documents: list):
 @function_tool
 def find(query, limit: int ):
     """
-    Read documents to find the desired value in a collection.
+    Read/find desired documents in a collection.
         Args:
             query (dict): The filter query to match documents (default: {} for all documents), example: {"age": {"$gt": 18}}. 
             limit (int): The maximum number of documents to return (default: 10).
@@ -68,34 +68,64 @@ def find(query, limit: int ):
     return  {"documents": cursor_list}             
     
 
-
+@function_tool
+def find_one_doc(key, value):
+    """
+    Read/find one document in the collection.
+        Args:
+            key (str): The key to look for in the documents.
+            value (str): Value of that particular key.
+    
+    """
+    
+    
+    cursor  = collection.find({key : value})
+    str_cursor_obj = list(cursor)
+    
+    for doc in str_cursor_obj:
+        if "_id" in doc:
+            doc["_id"] = str(doc["_id"])
+    
+    return str_cursor_obj
+    
 
 
 @function_tool
 def delete(filter):
     """
-    Delete a document from the MongoDB collection.
+    Delete/remove multiple documents from the MongoDB collection.
     Args:
-        key (str): The key for the document.
-        value (str): The value for the document.
-    
+        filter (dict): the mongoose filter query to delete documents based on.
     """
     result = collection.delete_many(filter)
     if result.deleted_count > 0:
-        return f"Document with key deleted successfully."
+        return "Documents deleted successfully."
     else:
-        return f"No document found."
+        return "No documents found."
 
+@function_tool
+def delete_one_doc(key, value):
+    """
+    Delete/remove a single document from the MongoDB collection.
+    Args:
+        key (str): Any key in that present in the document.
+        value (any): value of the key. 
+    """
+    
+    result = collection.delete_one({key, value})
+    if result.deleted_count >0:
+        return "Document Deleted"
+    else:
+        return "No document found"
 
 
 @function_tool
 def update(filter, update):
     """
-    Update a document in the MongoDB collection.
+    Update multiple documents in the MongoDB collection.
     Args:
-        key (str): The key for the document.
-        value (str): The current value for the document.
-        new_value (str): The new value to update the document with.
+        filter (dict): mongoose filter query to find documents based on.
+        update (dict): the new value to update to the document.
     
     """
     result = collection.update_many(filter, update)
@@ -104,7 +134,24 @@ def update(filter, update):
     else:
         return f"No document found with key."
 
-
+@function_tool
+def update_one_doc(key, value, update):
+    """
+    Update a single document in the MongoDB collection.
+    Args: 
+         key (str): The key to look for in the documents.
+         value (str): Value of that particular key. 
+         update (dict): The update operation (either $set, or $inc as per mongoose syntax) and value, e.g., {"$set": {"field": "new_value"}}.
+    """
+    
+    filter_query = {key: value}
+    
+    
+    result = collection.update_one(filter_query, update)
+    if result.deleted_count > 0:
+        return "Document updated"
+    else:
+        return "No document found"
 
 
 
@@ -112,21 +159,32 @@ async def main():
     agent = Agent(
         name= "crudMaster",
         instructions="""
-        You are a helpful assistant, who will use given tools for crud operations. And perform crud operations on mongodb. 
-        When you create a document,reply properly with created this xyz with this id.
-        When you read a document, reply properly with found "key": "value".
-        when you delete, give the delete tool a proper mongoose filter query and reply properly with deleted this id (grab the objectId before deleting to represent in final_output).
-        when you update, you will give the update function a mongoose filter query and update operation $set or $inc, reply updated doc with this id.
-        when you see the user is saying to read the whole collection, give the find tool proper mongoose query for that and list all values in "key":"value" pairs.
+        You are a helpful assistant, who will use given tools for crud operations. And perform crud operations on mongodb.
+         
+        Create: 
+            use create tool for document creations.
         
+        Delete:
+              use tool 'delete' when deleting multiple files.
+              use tool 'delete_one_doc' when deleting a single file.
+        
+        Update:
+                Use 'update_one_doc' when user asks to update a single document.
+                Use update when the user asks to update multiple documents.
+        
+        Read:
+            Use Read tool when you see the user is saying to read the whole collection.
+            Use find_one_doc tool when you see the user is saying to read one document.
+            
+        After each opeartion reply with specific details of that operation.    
         """,
         model= OpenAIChatCompletionsModel(model="gemini-2.0-flash", openai_client=external_client),
-        tools=[create, find, update, delete]
+        tools=[create, find, update, delete, find_one_doc, update_one_doc, delete_one_doc]
         
     )
     
     
-    response =  await Runner.run(agent, "create a user doc, with name habib, profession ai engineer, love agentic ai")
+    response =  await Runner.run(agent, "delete the document with name 'my goat'")
     
     print(response.final_output)
     
