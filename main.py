@@ -3,12 +3,18 @@ from dotenv import load_dotenv
 import os
 import asyncio
 from pymongo import MongoClient
-
+from fastapi import FastAPI
+from pydantic import BaseModel
 
 load_dotenv()
+app = FastAPI()
 
 
 
+
+
+class Prompt(BaseModel):
+    user_input: str
 
 
 MONGO_URI = os.getenv("MONGO_URI")
@@ -21,7 +27,7 @@ external_client = AsyncOpenAI(
 )
 
 
-# tools
+
 
 
 db_client = MongoClient(MONGO_URI)
@@ -30,7 +36,7 @@ db = db_client["test_bro"]
 
 collection = db["crud_collection"]
 
-
+# tools 
 
 @function_tool
 def create(documents: list):
@@ -141,7 +147,7 @@ def update_one_doc(key, value, update):
     Args: 
          key (str): The key to look for in the documents.
          value (str): Value of that particular key. 
-         update (dict): The update operation (either $set, or $inc as per mongoose syntax) and value, e.g., {"$set": {"field": "new_value"}}.
+         update (dict): The update operation (either $set, or $inc as per mongoose syntax) and value, e.g., {"$set": {"field": "new_value"}} or {"$inc": {"count": 1}}.
     """
     
     filter_query = {key: value}
@@ -154,40 +160,45 @@ def update_one_doc(key, value, update):
         return "No document found"
 
 
-
-async def main():
-    agent = Agent(
-        name= "crudMaster",
-        instructions="""
-        You are a helpful assistant, who will use given tools for crud operations. And perform crud operations on mongodb.
-         
-        Create: 
-            use create tool for document creations.
-        
-        Delete:
-              use tool 'delete' when deleting multiple files.
-              use tool 'delete_one_doc' when deleting a single file.
-        
-        Update:
-                Use 'update_one_doc' when user asks to update a single document.
-                Use update when the user asks to update multiple documents.
-        
-        Read:
-            Use Read tool when you see the user is saying to read the whole collection.
-            Use find_one_doc tool when you see the user is saying to read one document.
+@app.post("/agent/")
+async def main(prompt: Prompt):
+    try:
+        agent = Agent(
+            name= "crudMaster",
+            instructions="""
+            You are a helpful assistant, who will use given tools for crud operations. And perform crud operations on mongodb.
             
-        After each opeartion reply with specific details of that operation.    
-        """,
-        model= OpenAIChatCompletionsModel(model="gemini-2.0-flash", openai_client=external_client),
-        tools=[create, find, update, delete, find_one_doc, update_one_doc, delete_one_doc]
+                 
+            Create: 
+                use create tool for document creations.
+            
+            FOR SINGLE DOCUMENTS:
+                  'delete_one_doc' for deleting a single file.
+                  'update_one_doc' for updating a single document.
+                  'find_one_doc' for reading one document.
+            
+            
+            FOR MULTIPLE DOCUMENTS:
+                  use tool 'delete' when deleting multiple files.
+                  Use 'update' when the user asks to update multiple documents.
+                  Use 'find' tool when you see the user is saying to read the whole collection.
+            
+            
+                
+            After each opeartion reply with specific details of that operation.    
+            """,
+            model= OpenAIChatCompletionsModel(model="gemini-2.0-flash", openai_client=external_client),
+            tools=[create, find, update, delete, find_one_doc, update_one_doc, delete_one_doc]
+            
+        )
         
-    )
+        #prompt.user_input 
+        response =  await Runner.run(agent, prompt.user_input)
+        
+        return response.final_output
     
-    
-    response =  await Runner.run(agent, "delete the document with name 'my goat'")
-    
-    print(response.final_output)
-    
+    except Exception as e:
+        return {"error": str(e)}
     
 if __name__ == "__main__":
     asyncio.run(main())   
