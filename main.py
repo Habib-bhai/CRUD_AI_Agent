@@ -174,13 +174,13 @@ async def main(prompt: Prompt):
             
             FOR SINGLE DOCUMENTS:
                   'delete_one_doc' for deleting a single file.
-                  'update_one_doc' for updating a single document.
+                  'update_one_doc' for updating a single document. when updated always respond with "updated document, read the document to see changes"
                   'find_one_doc' for reading one document.
             
             
             FOR MULTIPLE DOCUMENTS:
                   use tool 'delete' when deleting multiple files.
-                  Use 'update' when the user asks to update multiple documents.
+                  Use 'update' when the user asks to update multiple documents.when updated always respond with "updated document, read the document to see changes"
                   Use 'find' tool when you see the user is saying to read the whole collection.
             
             
